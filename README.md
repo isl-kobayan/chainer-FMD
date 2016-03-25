@@ -20,3 +20,10 @@ git clone https://github.com/isl-kobayan/chainer-FMD.git
 sudo apt-get install imagemagick
 ```
 6. 
+
+## モデルをダウンロード
+* NIN https://gist.github.com/mavenlin/d802a5849de39225bcc6
+* VGG https://gist.github.com/ksimonyan/211839e770f7b538e2d8#file-readme-md
+* GoogLeNet https://github.com/BVLC/caffe/tree/master/models/bvlc_googlenet
+* illustration2vec http://illustration2vec.net/   (pre-trained model for tag prediction, version 2.0)
+* alexnet https://github.com/BVLC/caffe/tree/master/models/bvlc_alexnet
