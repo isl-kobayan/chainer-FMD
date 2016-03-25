@@ -21,7 +21,8 @@ sudo apt-get install imagemagick
 ```
 6. 
 
-## モデルをダウンロード
+## モデルのダウンロード
+下記のURLからcaffemodelをダウンロードして、modelsフォルダに置いてください。
 * NIN https://gist.github.com/mavenlin/d802a5849de39225bcc6
 * VGG https://gist.github.com/ksimonyan/211839e770f7b538e2d8#file-readme-md
 * GoogLeNet https://github.com/BVLC/caffe/tree/master/models/bvlc_googlenet
