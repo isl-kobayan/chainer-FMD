@@ -1,5 +1,5 @@
 # chainer-FMD
-Image classifier for FMD in chainer
+Image classifier for Flickr Material Database (FMD) in chainer
 
 ## Setup
 
