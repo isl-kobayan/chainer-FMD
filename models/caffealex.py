@@ -9,9 +9,9 @@ class CaffeAlex(caffe.CaffeFunction):
 
     def __init__(self):
         self.labelsize = 10
-        print ('loading caffemodel ...')
+        sys.stderr.write ('loading caffemodel ...\n')
         super(CaffeAlex, self).__init__('./models/bvlc_alexnet.caffemodel')
-        print ('Done.')
+        sys.stderr.write ('Done.\n')
         super(CaffeAlex, self).add_link('fc8fmd', F.Linear(4096, self.labelsize))
         self.train = True
 

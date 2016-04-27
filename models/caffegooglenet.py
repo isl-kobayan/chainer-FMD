@@ -9,10 +9,10 @@ class CaffeGoogLeNet(caffe.CaffeFunction):
 
     def __init__(self):
         self.labelsize = 10
-        print ('loading caffemodel ...')
+        sys.stderr.write ('loading caffemodel ...\n')
         #self = caffe.CaffeFunction('bvlc_googlenet.caffemodel')
         super(CaffeGoogLeNet, self).__init__('./models/bvlc_googlenet.caffemodel')
-        print ('Done.')
+        sys.stderr.write ('Done.\n')
         super(CaffeGoogLeNet, self).add_link('loss3_fc', F.Linear(1024, self.labelsize))
         super(CaffeGoogLeNet, self).add_link('loss1_fc2', F.Linear(1024, self.labelsize))
         super(CaffeGoogLeNet, self).add_link('loss2_fc2', F.Linear(1024, self.labelsize))

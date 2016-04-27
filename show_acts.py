@@ -36,7 +36,7 @@ import models
 
 parser = argparse.ArgumentParser(
     description='Learning convnet from Flickr Material Database')
-parser.add_argument('--val', '-v', default='test_list.txt',
+parser.add_argument('--val', '-v', default='val.txt',
                     help='Path to validation image-label list file')
 parser.add_argument('--label', '-l', default='num2label.txt',
                     help='Path to validation image-label list file')
@@ -78,7 +78,17 @@ xp = cuda.cupy if args.gpu >= 0 else np
 #train_list = fmdio.load_image_list(args.train, args.root)
 num2label = fmdio.load_num2label(args.label)
 val_list = fmdio.load_image_list(args.val, args.root)
-mean_image = pickle.load(open(args.mean, 'rb'))
+#mean_image = pickle.load(open(args.mean, 'rb'))
+mean_image = None
+if args.arch == 'googlenet' or args.arch == 'googlenet2' or args.arch == 'caffegooglenet':
+    mean_image = np.ndarray((3, 256, 256), dtype=np.float32)
+    mean_image[0] = 104
+    mean_image[1] = 117
+    mean_image[2] = 123
+else:
+    mean_image = pickle.load(open(args.mean, 'rb'))
+
+assert mean_image is not None
 
 #train_size = len(train_list)
 val_size = len(val_list)

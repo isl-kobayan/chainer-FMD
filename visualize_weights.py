@@ -41,9 +41,7 @@ parser = argparse.ArgumentParser(
     description='Learning Flickr Material Database')
 #parser.add_argument('--trainfile', '-f', default='image_list.txt',
 #                    help='Path to training image-label list file')
-parser.add_argument('--modelfile', '-i', 
-                    help='Path to model file')
-parser.add_argument('--val', '-v', default='test_list.txt',
+parser.add_argument('--val', '-v', default='val.txt',
                     help='Path to validation image-label list file')
 parser.add_argument('--layername', '-l', default='conv1',
                     help='layer name (example: conv1, fc6, etc)')
@@ -91,23 +89,9 @@ lblmax = np.asarray(val_list)[:,1].astype(np.int32).max() + 1
 print(lblmax)
 print(args.val_batchsize)
 
-if args.arch == 'nin':
-    model = models.NIN()
-elif args.arch == 'alex':
-    model = models.Alex()
-elif args.arch == 'alexbn':
-    model = models.AlexBN()
-elif args.arch == 'googlenet':
-    model = models.GoogLeNet()
-elif args.arch == 'googlenet2':
-    model = models.GoogLeNet2()
-elif args.arch == 'googlenetbn':
-    model = models.GoogLeNetBN()
-elif args.arch == 'caffealex':
-    model = models.CaffeAlex()
-elif args.arch == 'caffegooglenet':
-    model = models.CaffeGoogLeNet()
-else:
+# Prepare model
+model = models.getModel(args.arch)
+if model is None:
     raise ValueError('Invalid architecture name')
 
 print(model.__class__.__name__)
@@ -129,7 +113,7 @@ if args.initmodel:
 
 nowt=datetime.datetime.today()
 layername_without_special_char = args.layername.replace('/', '_')
-outdir=os.path.dirname(args.modelfile)+'/Weights_'+layername_without_special_char
+outdir=os.path.dirname(args.initmodel)+'/Weights_'+layername_without_special_char
 os.mkdir(outdir)
 #args.out=outdir + '/' + args.out
 

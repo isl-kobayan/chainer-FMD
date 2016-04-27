@@ -10,9 +10,9 @@ class CaffeVGG(caffe.CaffeFunction):
 
     def __init__(self):
         self.labelsize = 10
-        print ('loading caffemodel ...')
+        sys.stderr.write ('loading caffemodel ...\n')
         super(CaffeVGG, self).__init__('./models/VGG_ILSVRC_16_layers.caffemodel')
-        print ('Done.')
+        sys.stderr.write ('Done.\n')
         super(CaffeVGG, self).add_link('fc8fmd', F.Linear(4096, self.labelsize))
         self.train = True
 

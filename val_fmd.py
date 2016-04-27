@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Example code of learning Flickr Material Dataset (FMD).
+"""Example code of learning a large scale convnet from ILSVRC2012 dataset.
 
 Prerequisite: To run this example, crop the center of ILSVRC2012 training and
 validation images and scale them to 256x256, and make two lists of space-
@@ -29,34 +29,26 @@ from chainer import computational_graph
 from chainer import cuda
 from chainer import optimizers
 from chainer import serializers
+import chainer.functions as F
 
 import fmdio
 import models
 
 parser = argparse.ArgumentParser(
     description='Learning convnet from Flickr Material Database')
-parser.add_argument('--train', '-t', default='train.txt',
-                    help='Path to training image-label list file')
 parser.add_argument('--val', '-v', default='val.txt',
+                    help='Path to validation image-label list file')
+parser.add_argument('--label', '-l', default='num2label.txt',
                     help='Path to validation image-label list file')
 parser.add_argument('--mean', '-m', default='mean.npy',
                     help='Path to the mean file (computed by compute_mean.py)')
 parser.add_argument('--arch', '-a', default='nin',
                     help='Convnet architecture \
                     (nin, alex, alexbn, googlenet, googlenet2, googlenetbn, caffealex, caffegooglenet, vggnet, caffevgg, chainervggnet)')
-parser.add_argument('--opt', '-p', default='adam',
-                    help='optimizer \
-                    (adam, adadelta, adagrad, momentumsgd, rmsprop)')
-parser.add_argument('--initlr', default=0.01, type=float,
-                    help='Initialize the learning rate from given value')
-parser.add_argument('--lrstep', default=0.97, type=float,
-                    help='Set learning rate scale')
 parser.add_argument('--batchsize', '-B', type=int, default=10,
                     help='Learning minibatch size')
 parser.add_argument('--val_batchsize', '-b', type=int, default=10,
                     help='Validation minibatch size')
-parser.add_argument('--val_interval', '-i', type=int, default=0,
-                    help='Validation interval')
 parser.add_argument('--epoch', '-E', default=10, type=int,
                     help='Number of epochs to learn')
 parser.add_argument('--gpu', '-g', default=0, type=int,
@@ -65,12 +57,10 @@ parser.add_argument('--loaderjob', '-j', default=20, type=int,
                     help='Number of parallel data loading processes')
 parser.add_argument('--root', '-r', default='.',
                     help='Root directory path of image files')
-parser.add_argument('--out', '-o', default='model',
+parser.add_argument('--out', '-o', default=None,
                     help='Path to save model on each validation')
 parser.add_argument('--outstate', '-s', default='state',
                     help='Path to save optimizer state on each validation')
-parser.add_argument('--finetune', '-f', default=False, action='store_true',
-                    help='do fine-tuning if this flag is set (default: False)')
 parser.add_argument('--initmodel', default='',
                     help='Initialize the model from given file')
 parser.add_argument('--resume', default='',
@@ -85,8 +75,10 @@ else:
 xp = cuda.cupy if args.gpu >= 0 else np
 
 # Prepare dataset
-train_list = fmdio.load_image_list(args.train, args.root)
+#train_list = fmdio.load_image_list(args.train, args.root)
+num2label = fmdio.load_num2label(args.label)
 val_list = fmdio.load_image_list(args.val, args.root)
+#mean_image = pickle.load(open(args.mean, 'rb'))
 mean_image = None
 if args.arch == 'googlenet' or args.arch == 'googlenet2' or args.arch == 'caffegooglenet':
     mean_image = np.ndarray((3, 256, 256), dtype=np.float32)
@@ -98,54 +90,36 @@ else:
 
 assert mean_image is not None
 
-train_size = len(train_list)
+#train_size = len(train_list)
 val_size = len(val_list)
 
-if args.val_interval == 0:
-    args.val_interval = train_size# / args.batchsize
-iterates_per_epoch = train_size / args.batchsize
-assert train_size % args.batchsize == 0
 assert val_size % args.val_batchsize == 0
 
 # Prepare model
 model = models.getModel(args.arch)
 if model is None:
     raise ValueError('Invalid architecture name')
-if args.finetune:
-    print ('finetune')
-    model.set_finetune()
 
 print(model.__class__.__name__)
 print('total epoch : ' + str(args.epoch))
-print('batchsize (train) : ' + str(args.batchsize))
-print('batchsize (validation) : ' + str(args.val_batchsize))
 
 nowt = datetime.datetime.today()
-outdir = './results/' + args.arch + '_bs' + str(args.batchsize) + '_' + nowt.strftime("%Y%m%d-%H%M")
-os.makedirs(outdir)
-args.out = outdir + '/' + args.out + '_' + args.arch
-args.outstate = outdir + '/' + args.outstate
+outdir = './test_' + args.arch + '_bs' + str(args.val_batchsize) + '_' + nowt.strftime("%Y%m%d-%H%M")
+if args.out is None:
+    outdir = os.path.dirname(args.initmodel)
+else:
+    outdir = args.out
+    os.mkdir(outdir)
+
+lblmax = np.asarray(val_list)[:,1].astype(np.int32).max() + 1
+print(lblmax)
 
 if args.gpu >= 0:
     cuda.get_device(args.gpu).use()
     model.to_gpu()
 
 # Setup optimizer
-#optimizer = optimizers.MomentumSGD(lr=0.01, momentum=0.9)
-# Setup optimizer
-if args.opt == 'adam':
-    optimizer = optimizers.Adam()
-elif args.opt == 'momentumsgd':
-    optimizer = optimizers.MomentumSGD(lr=args.initlr, momentum=0.9)
-elif args.opt == 'adadelta':
-    optimizer = optimizers.AdaDelta()
-elif args.opt == 'adagrad':
-    optimizer = optimizers.AdaGrad()
-elif args.opt == 'rmsprop':
-    optimizer = optimizers.RMSprop()
-else:
-    raise ValueError('Invalid optimizer name')
-print(optimizer.__class__.__name__)
+optimizer = optimizers.MomentumSGD(lr=0.01, momentum=0.9)
 optimizer.setup(model)
 
 # Init/Resume
@@ -156,6 +130,8 @@ if args.resume:
     print('Load optimizer state from', args.resume)
     serializers.load_hdf5(args.resume, optimizer)
 
+print(model.links)
+print(model.namedlinks)
 
 # ------------------------------------------------------------------------------
 # This example consists of three threads: data feeder, logger and trainer.
@@ -174,47 +150,25 @@ def feed_data():
     val_x_batch = np.ndarray(
         (args.val_batchsize, 3, model.insize, model.insize), dtype=np.float32)
     val_y_batch = np.ndarray((args.val_batchsize,), dtype=np.int32)
-
+    val_i_batch = np.ndarray((args.val_batchsize,), dtype=np.int32)
     batch_pool = [None] * args.batchsize
     val_batch_pool = [None] * args.val_batchsize
     pool = multiprocessing.Pool(args.loaderjob)
-    data_q.put('train')
-    for epoch in six.moves.range(1, 1 + args.epoch):
-        print('epoch', epoch, file=sys.stderr)
-        if args.opt == 'momentumsgd':
-            print('learning rate', optimizer.lr, file=sys.stderr)
-        perm = np.random.permutation(len(train_list))
-        for idx in perm:
-            path, label = train_list[idx]
-            batch_pool[i] = pool.apply_async(fmdio.read_image, (path, model.insize, mean_image, False, True))
-            y_batch[i] = label
-            i += 1
+    data_q.put('val')
+    j = 0
+    for idx, pl in enumerate(val_list):
+        path, label = pl
+        val_batch_pool[j] = pool.apply_async(
+            fmdio.read_image, (path, model.insize, mean_image, True, False))
+        val_y_batch[j] = label
+        val_i_batch[j] = idx
+        j += 1
 
-            if i == args.batchsize:
-                for j, x in enumerate(batch_pool):
-                    x_batch[j] = x.get()
-                data_q.put((x_batch.copy(), y_batch.copy()))
-                i = 0
-
-            count += 1
-            if count % args.val_interval == 0:
-                data_q.put('val')
-                j = 0
-                for path, label in val_list:
-                    val_batch_pool[j] = pool.apply_async(
-                        fmdio.read_image, (path, model.insize, mean_image, True, False))
-                    val_y_batch[j] = label
-                    j += 1
-
-                    if j == args.val_batchsize:
-                        for k, x in enumerate(val_batch_pool):
-                            val_x_batch[k] = x.get()
-                        data_q.put((val_x_batch.copy(), val_y_batch.copy()))
-                        j = 0
-                data_q.put('train')
-
-        if args.opt == 'momentumsgd':
-            optimizer.lr *= args.lrstep
+        if j == args.val_batchsize:
+            for k, x in enumerate(val_batch_pool):
+                val_x_batch[k] = x.get()
+            data_q.put((val_x_batch.copy(), val_y_batch.copy(), val_i_batch.copy()))
+            j = 0
     pool.close()
     pool.join()
     data_q.put('end')
@@ -222,25 +176,28 @@ def feed_data():
 
 def log_result():
     # Logger
-    trainlogfilename=outdir+'/train.log'
-    testlogfilename=outdir+'/val.log'
+    trainlogfilename=outdir+'/test_train.log'
+    testlogfilename=outdir+'/test_result.log'
+    tablefilename=outdir+'/table.csv'
+    confmatfigfilename=outdir+'/confmat.eps'
+    compfilename=outdir+'/comp.log'
+    confusion_matrix=np.zeros(lblmax*lblmax, dtype=np.int32)
     train_count = 0
     train_cur_loss = 0
     train_cur_accuracy = 0
     begin_at = time.time()
     val_begin_at = None
+    with open(compfilename, 'w') as f:
+        label_col_str = ''
+        for labelname in num2label:
+            label_col_str = label_col_str + '\t' + labelname
+        f.write('path\ttrue_label\tpred_label' + label_col_str +'\n')
+
     while True:
         result = res_q.get()
         if result == 'end':
             print(file=sys.stderr)
             break
-        elif result == 'train':
-            print(file=sys.stderr)
-            train = True
-            if val_begin_at is not None:
-                begin_at += time.time() - val_begin_at
-                val_begin_at = None
-            continue
         elif result == 'val':
             print(file=sys.stderr)
             train = False
@@ -248,31 +205,13 @@ def log_result():
             val_begin_at = time.time()
             continue
 
-        loss, accuracy = result
-        if train:
-            train_count += 1
-            duration = time.time() - begin_at
-            throughput = train_count * args.batchsize / duration
-            sys.stderr.write(
-                '\rtrain {} updates ({} samples) time: {} ({} images/sec)'
-                .format(train_count, train_count * args.batchsize,
-                        datetime.timedelta(seconds=duration), throughput))
+        loss, accuracy, lastacts, y_true, list_indices = result
+        last_activities = chainer.Variable(xp.asarray(lastacts), volatile='on')
+        probability_map = F.softmax(last_activities)
+        y_pred = lastacts.reshape(len(lastacts), -1).argmax(axis=1)
+        confusion_indices = xp.asarray(y_true)*lblmax + y_pred
 
-            train_cur_loss += loss
-            train_cur_accuracy += accuracy
-            if train_count % iterates_per_epoch == 0:
-                mean_loss = train_cur_loss / iterates_per_epoch
-                mean_error = 1 - train_cur_accuracy / iterates_per_epoch
-                print(file=sys.stderr)
-                print(json.dumps({'type': 'train', 'iteration': train_count,
-                                  'error': mean_error, 'loss': mean_loss}))
-                with open(trainlogfilename, 'a') as f:
-                    f.write(json.dumps({'type': 'train', 'iteration': train_count,
-                                        'error': mean_error, 'loss': mean_loss})+'\n')
-                sys.stdout.flush()
-                train_cur_loss = 0
-                train_cur_accuracy = 0
-        else:
+        if not train:
             val_count += args.val_batchsize
             duration = time.time() - val_begin_at
             throughput = val_count / duration
@@ -283,6 +222,17 @@ def log_result():
 
             val_loss += loss
             val_accuracy += accuracy
+            for idx in confusion_indices:
+                confusion_matrix[int(idx)]+=1
+            res_str = ''
+            for idx, list_idx in enumerate(list_indices):
+                path, label = val_list[list_idx]
+                res_str = res_str + path + '\t' + num2label[label] + '\t' + num2label[int(y_pred[idx])]
+                for label_idx in six.moves.range(lblmax):
+                    res_str = res_str + '\t' + str(probability_map.data[idx, label_idx])
+                res_str = res_str + '\n'
+            with open(compfilename, 'a') as f:
+                f.write(res_str)
             if val_count == val_size:
                 mean_loss = val_loss * args.val_batchsize / val_size
                 mean_error = 1 - val_accuracy * args.val_batchsize / val_size
@@ -293,7 +243,12 @@ def log_result():
                     f.write(json.dumps({'type': 'val', 'iteration': train_count,
                                         'error': mean_error, 'loss': mean_loss})+'\n')
                 sys.stdout.flush()
-
+                print(confusion_matrix.reshape((lblmax,lblmax)))
+                #np.savetxt(tablefilename, confusion_matrix.reshape((lblmax,lblmax)), delimiter=",", fmt='%d')
+                fmdio.save_confusion_matrix(tablefilename, confusion_matrix, num2label)
+                labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                fmdio.save_confmat_fig(confusion_matrix.reshape((lblmax,lblmax)), confmatfigfilename, num2label, mode="rate", saveFormat="eps")
+        del last_activities, probability_map
 
 def train_loop():
     # Trainer
@@ -306,40 +261,18 @@ def train_loop():
         if inp == 'end':  # quit
             res_q.put('end')
             break
-        elif inp == 'train':  # restart training
-            res_q.put('train')
-            model.train = True
-            continue
         elif inp == 'val':  # start validation
             res_q.put('val')
-            serializers.save_hdf5(args.out, model)
-            serializers.save_hdf5(args.outstate, optimizer)
-            if ep % 10 == 0:
-                serializers.save_hdf5(args.out + str(ep), model)
-                serializers.save_hdf5(args.outstate + str(ep), optimizer)
-            ep = ep+1
             model.train = False
             continue
 
         volatile = 'off' if model.train else 'on'
         x = chainer.Variable(xp.asarray(inp[0]), volatile=volatile)
         t = chainer.Variable(xp.asarray(inp[1]), volatile=volatile)
-
-        if model.train:
-            optimizer.update(model, x, t)
-            if not graph_generated:
-                with open(outdir + '/graph_' + args.arch + '.dot', 'w') as o:
-                    o.write(computational_graph.build_computational_graph(
-                        (model.loss,)).dump())
-                print('generated graph', file=sys.stderr)
-                graph_generated = True
-                pickle.dump(args, open(outdir + '/args', 'wb'), -1)
-                with open(outdir + '/args.txt', 'w') as o:
-                    print(args, file=o)
-        else:
-            model(x, t)
-
-        res_q.put((float(model.loss.data), float(model.accuracy.data)))
+        indices = np.asarray(inp[2])
+        y_true = np.asarray(inp[1])
+        model.test(x, t)
+        res_q.put((float(model.loss.data), float(model.accuracy.data), model.lastacts.data, y_true, indices))
         del x, t
 
 # Invoke threads
@@ -353,7 +286,3 @@ logger.start()
 train_loop()
 feeder.join()
 logger.join()
-
-# Save final model
-serializers.save_hdf5(args.out, model)
-serializers.save_hdf5(args.outstate, optimizer)
