@@ -10,6 +10,7 @@ import VGGNet
 import caffevgg
 import chainerVGGNet
 import googlenetfmd
+import vgg16
 
 NIN = nin.NIN
 Alex = alex.Alex
@@ -23,6 +24,7 @@ VGGNet = VGGNet.VGGNet
 CaffeVGG = caffevgg.CaffeVGG
 ChainerVGGNet = chainerVGGNet.ChainerVGGNet
 GoogLeNetFMD = googlenetfmd.GoogLeNet
+VGG16 = vgg16.VGG16
 
 def getModel(arch):
     if arch == 'nin':
@@ -31,6 +33,8 @@ def getModel(arch):
         return Alex()
     elif arch == 'alexbn':
         return AlexBN()
+    elif arch == 'vgg16':
+            return VGG16()
     elif arch == 'googlenet':
         return GoogLeNet()
     elif arch == 'googlenetfmd':
