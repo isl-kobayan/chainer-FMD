@@ -2,12 +2,20 @@ import subprocess
 import json
 import argparse
 
+import train_fmd
+
 parser = argparse.ArgumentParser(
     description='Learning convnet from Flickr Material Database')
+parser.add_argument('--train', '-t', default='train.txt',
+                    help='Path to training image-label list file')
+parser.add_argument('--val', '-v', default='val.txt',
+                    help='Path to validation image-label list file')
+parser.add_argument('--mean', '-m', default='mean.npy',
+                    help='Path to the mean file (computed by compute_mean.py)')
 parser.add_argument('--arch', '-a', default='nin',
                     help='Convnet architecture \
-                    (nin, alex, alexbn, googlenet, googlenet2, googlenetbn, caffealex, caffegooglenet, vggnet, caffevgg, chainervggnet)')
-parser.add_argument('--opt', '-p', default='adam',
+                    (nin, alex, alexbn, vgg16, googlenet, googlenet2, googlenetbn, caffealex, caffegooglenet)')
+parser.add_argument('--opt', '-p', default='momentumsgd',
                     help='optimizer \
                     (adam, adadelta, adagrad, momentumsgd, rmsprop)')
 parser.add_argument('--initlr', default=0.01, type=float,
@@ -18,47 +26,58 @@ parser.add_argument('--batchsize', '-B', type=int, default=10,
                     help='Learning minibatch size')
 parser.add_argument('--val_batchsize', '-b', type=int, default=10,
                     help='Validation minibatch size')
-parser.add_argument('--epoch', '-E', default=40, type=int,
+parser.add_argument('--val_interval', '-i', type=int, default=0,
+                    help='Validation interval')
+parser.add_argument('--epoch', '-E', default=10, type=int,
                     help='Number of epochs to learn')
-parser.add_argument('--iteration', '-I', default=0, type=int,
-                    help='Number of iterations to learn')
+parser.add_argument('--gpu', '-g', default=0, type=int,
+                    help='GPU ID (negative value indicates CPU)')
+parser.add_argument('--loaderjob', '-j', default=20, type=int,
+                    help='Number of parallel data loading processes')
+parser.add_argument('--root', '-r', default='.',
+                    help='Root directory path of image files')
+parser.add_argument('--out', '-o', default='model',
+                    help='Path to save model on each validation')
+parser.add_argument('--outstate', '-s', default='state',
+                    help='Path to save optimizer state on each validation')
+parser.add_argument('--finetune', '-f', default=True, action='store_true',
+                    help='do fine-tuning if this flag is set (default: False)')
+parser.add_argument('--initmodel', default='',
+                    help='Initialize the model from given file')
+parser.add_argument('--resume', default='',
+                    help='Resume the optimization from snapshot')
 args = parser.parse_args()
 
 #batchsizes = [1,2,4,8,10,16,20,25,40,50,100]
-batchsizes = [10,16,20,25,40,50]
-initlrs = [0.0005, 0.001, 0.005]
-lrsteps = [0.97, 0.94]
+#batchsizes = [10,16,20,25,40,50]
+#initlrs = [0.0005, 0.001, 0.005]
+#lrsteps = [0.97, 0.94]
+batchsizes = [10]
+initlrs = [0.005]
+lrsteps = [0.97]
+
 #batchsizes = [40]
 #archs = ['caffealex', 'caffegooglenet', 'caffevgg']
-archs = ['caffegooglenet', 'caffealex']
+#archs = ['caffegooglenet', 'caffealex']
 #archs = ['caffevgg']
 #archs = ['caffealex']
-results="arch\tbatchsize\tinitlr\tlrstep\terror(train)\terror(val)\tloss(train)\tloss(val)\n"
+archs = ['googlenet']
+results="dir\tarch\tbatchsize\tinitlr\tlrstep\terror(train)\terror(val)\tloss(train)\tloss(val)\n"
 with open('results/GAResults.txt', 'a') as f:
     f.write(results)
 
 for initlr in initlrs:
+    args.initlr = initlr
     for lrstep in lrsteps:
+        args.lrstep = lrstep
         for arch in archs:
+            args.arch = arch
             for bs in batchsizes:
-                output = subprocess.check_output("python train_fmd.py -p momentumsgd -a " + arch + " -B " + str(bs)
-	        + " -b 20 -E " + str(args.epoch) + " --initlr " + str(initlr) + " --lrstep " + str(lrstep), shell=True)
-                #output = subprocess.check_output("python train_fmd.py -p adam -a " + arch + " -B " + str(bs)
-	        #+ " -b 20 -E " + str(args.epoch) + " --initlr " + str(initlr) + " --lrstep " + str(lrstep), shell=True)
-                #print(output)
-                outputs = output.split('\n')
-                final_train = None
-                final_val = None
-                for line in outputs:
-                    if line.find('train') >= 0:
-                        final_train = line
-                    elif line.find('val') >= 0:
-                        final_val = line
-                train_info = json.loads(final_train)
-                val_info = json.loads(final_val)
-                result = arch + '\t' + str(bs) + '\t' + str(initlr) + '\t' + str(lrstep) + '\t' \
-                    + str(train_info['error']) + '\t' + str(val_info['error']) + '\t' \
-                    + str(train_info['loss']) + '\t' + str(val_info['loss'])
+                args.batchsize = bs
+                ret = train_fmd.train(args)
+                result = ret.outdir + '\t' + arch + '\t' + str(bs) + '\t' + str(initlr) + '\t' + str(lrstep) + '\t' \
+                    + str(ret.train_error) + '\t' + str(ret.val_error) + '\t' \
+                    + str(ret.train_loss) + '\t' + str(ret.val_loss)
                 with open('results/GAResults.txt', 'a') as f:
                             f.write(result + '\n')
                 results += result + '\n'
