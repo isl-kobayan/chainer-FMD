@@ -86,23 +86,8 @@ val_size = len(val_list)
 assert val_size % args.val_batchsize == 0
 
 # Prepare model
-if args.arch == 'nin':
-    model = models.NIN()
-elif args.arch == 'alex':
-    model = models.Alex()
-elif args.arch == 'alexbn':
-    model = models.AlexBN()
-elif args.arch == 'googlenet':
-    model = models.GoogLeNet()
-elif args.arch == 'googlenet2':
-    model = models.GoogLeNet2()
-elif args.arch == 'googlenetbn':
-    model = models.GoogLeNetBN()
-elif args.arch == 'caffealex':
-    model = models.CaffeAlex()
-elif args.arch == 'caffegooglenet':
-    model = models.CaffeGoogLeNet()
-else:
+model = models.getModel(args.arch)
+if model is None:
     raise ValueError('Invalid architecture name')
 
 print(model.__class__.__name__)
@@ -168,7 +153,7 @@ def feed_data():
         val_y_batch[j] = label
         val_i_batch[j] = idx
         j += 1
-        
+
         if j == args.val_batchsize:
             for k, x in enumerate(val_batch_pool):
                 val_x_batch[k] = x.get()
@@ -241,17 +226,17 @@ def log_result():
             else:
                 allacts = np.r_[allacts, acts.get().reshape((len(acts), -1))]
             #print(allacts.shape)
-            
+
             for idx, list_idx in enumerate(list_indices):
                 path, label = val_list[list_idx]
                 res_str = res_str + path + '\t' + num2label[label] + '\t' + num2label[int(y_pred[idx])]
                 acts_str = acts_str + path + '\t' + num2label[label] + '\t' + num2label[int(y_pred[idx])]
                 thisacts=acts[idx].get().reshape(len(acts[idx]))
                 #fmdio.append_acts(actsfilename, path, thisacts)
-                
+
                 for label_idx in six.moves.range(lblmax):
                     res_str = res_str + '\t' + str(probability_map.data[idx, label_idx])
-                    #acts_str = acts_str + 
+                    #acts_str = acts_str +
                     #print(thisacts.shape)
                 res_str = res_str + '\n'
                 acts_str = acts_str + '\n'
@@ -309,5 +294,3 @@ logger.start()
 train_loop()
 feeder.join()
 logger.join()
-
-

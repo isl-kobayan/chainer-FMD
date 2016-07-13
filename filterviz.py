@@ -1,7 +1,11 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 """ visualizing filters of convolutional layer.
+最初の畳み込み層のフィルタを可視化します。
 
-Prerequisite: To run this program, prepare model's weights data with hdf-5 format.
+Prerequisite: To run this program, prepare model's weights data with hdf5 format.
+train_fmd.py等で生成される、hdf5形式で保存された重みデータ（model_googlenet）を用意してください。
+
 """
 from __future__ import print_function
 import argparse
@@ -69,7 +73,8 @@ if args.initmodel:
     serializers.load_hdf5(args.initmodel, model)
 
 layername_without_special_char = args.layername.replace('/', '_')
-outdir = os.path.dirname(args.initmodel) + '/Weights_' + layername_without_special_char
+#outdir = os.path.dirname(args.initmodel) + '/Weights_' + layername_without_special_char
+outdir = './Weights_' + args.arch + '_' + layername_without_special_char
 if not os.path.exists(outdir):
     os.makedirs(outdir)
 
@@ -96,11 +101,11 @@ all_img = Image.new('RGB', (all_img_width, all_img_height), (255, 255, 255))
 # if number of input channels is 3, visualize filter with RGB
 if in_ch == 3:
     for i in six.moves.range(0, out_ch):
-        filter_data = (W[i].transpose(1, 2, 0) - Wmin) * 255 / Wrange
+        filter_data = (W[i][::-1].transpose(1, 2, 0) - Wmin) * 255 / Wrange
         img = Image.fromarray(np.uint8(filter_data))
         if args.scale > 1:
             img = img.resize((width * scale, height * scale), Image.NEAREST)
-        all_img.paste(img, (pad + (i % cols) * w_step, pad + (int)(i / rows) * h_step))
+        all_img.paste(img, (pad + (i % cols) * w_step, pad + (int)(i // cols) * h_step))
         img.save(outdir + '/w' + str(i) + '.png')
     all_img.save(outdir + '/filters.png')
 else:

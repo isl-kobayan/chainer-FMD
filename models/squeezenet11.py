@@ -2,8 +2,9 @@ import chainer
 import chainer.functions as F
 import chainer.links as L
 import finetune
+import numpy as np
 
-class SqueezeNet10(chainer.Chain):
+class SqueezeNet11(chainer.Chain):
 
     """SqueezeNet v1.0"""
 
@@ -17,17 +18,24 @@ class SqueezeNet10(chainer.Chain):
         return y
 
     def add_fire(self, name, in_channels, s1, e1, e3):
-        super(GoogLeNet, self).add_link(name + '/squeeze1x1', F.Convolution2D(in_channels, s1, 1))
-        super(GoogLeNet, self).add_link(name + '/expand1x1', F.Convolution2D(e1, s1, 1))
-        super(GoogLeNet, self).add_link(name + '/expand3x3', F.Convolution2D(e1, s3, 3, pad=1))
+        super(SqueezeNet11, self).add_link(name + '/squeeze1x1', F.Convolution2D(in_channels, s1, 1))
+        super(SqueezeNet11, self).add_link(name + '/expand1x1', F.Convolution2D(s1, e1, 1))
+        super(SqueezeNet11, self).add_link(name + '/expand3x3', F.Convolution2D(s1, e3, 3, pad=1))
+
+    def getMean(self):
+        mean_image = np.ndarray((3, 256, 256), dtype=np.float32)
+        mean_image[0] = 104
+        mean_image[1] = 117
+        mean_image[2] = 123
+        return mean_image
 
     def set_finetune(self):
         finetune.load_param('./models/squeezenet_v1.1.pkl', self)
 
     def __init__(self):
         self.labelsize = 10
-        super(SqueezeNet10, self).__init__()
-        super(SqueezeNet10, self).add_link('conv1', F.Convolution2D(3,  64, 3, stride=2))
+        super(SqueezeNet11, self).__init__()
+        super(SqueezeNet11, self).add_link('conv1', F.Convolution2D(3,  64, 3, stride=2))
         self.add_fire('fire2', 64, 16, 64, 64)
         self.add_fire('fire3', 128, 16, 64, 64)
         self.add_fire('fire4', 128, 32, 128, 128)
@@ -36,9 +44,9 @@ class SqueezeNet10(chainer.Chain):
         self.add_fire('fire7', 384, 48, 192, 192)
         self.add_fire('fire8', 384, 64, 256, 256)
         self.add_fire('fire9', 512, 64, 256, 256)
-        super(SqueezeNet10, self).add_link('conv10_fmd', F.Convolution2D(
+        super(SqueezeNet11, self).add_link('conv10_fmd', F.Convolution2D(
             512, self.labelsize, 1, pad=1,
-            initialW=normal(0, 0.01 (self.labelsize, 512, 1, 1))))
+            initialW=np.random.normal(0, 0.01, (self.labelsize, 512, 1, 1))))
 
         self.train = True
 
@@ -71,8 +79,7 @@ class SqueezeNet10(chainer.Chain):
         h = self.my_fire(h, 'fire7')
         h = self.my_fire(h, 'fire8')
         h = self.my_fire(h, 'fire9')
-        h = F.dropout(h, ratio=0.5, train=train)
-        print(h.data.shape)
+        h = F.dropout(h, ratio=0.5, train=self.train)
         h = F.relu(self.conv10_fmd(h))
         h = F.reshape(F.average_pooling_2d(h, h.data.shape[2]), (x.data.shape[0], self.labelsize))
 
@@ -98,7 +105,7 @@ class SqueezeNet10(chainer.Chain):
         h = F.max_pooling_2d(h, 3, stride=2)
 
         h = self.my_fire(h, 'fire9')
-        h = F.dropout(h, ratio=0.5, train=train)
+        h = F.dropout(h, ratio=0.5, train=self.train)
 
         h = F.relu(self.conv10_fmd(h))
         h = F.reshape(F.average_pooling_2d(h, 13), (x.data.shape[0], self.labelsize))

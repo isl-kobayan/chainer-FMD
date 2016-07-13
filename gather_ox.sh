@@ -1,7 +1,16 @@
 #!/bin/bash
+# show_acts.pyを先に実行し、comp.logを作成しておくこと。
+# chainer-FMDの認識結果ログ(comp.log)を元に、画像を次のように保存します。
+# ・正しく認識できた画像をcorrectディレクトリに
+# ・誤認識した画像をincorrectディレクトリに
+# ・認識結果をconfusionディレクトリに
+# confusionディレクトリには、正解クラスごとにディレクトリが作成され、
+# 例えば、fabricの画像をfoliageに誤認識した場合、foliage_fabric_**.jpgのようなファイル名で保存します。
 
-# delete file if exists
-function clearf() {
+#usage: gather_ox.sh ****/comp.log
+
+# remove file if exists
+function rm_if_exists() {
   if [ -e $1 ]; then
     if [ -f $1 ] ; then
       rm $1
@@ -11,7 +20,7 @@ function clearf() {
   fi
 }
 
-function mkdirifnotexists() {
+function mkdir_if_not_exists() {
   if [ ! -e $1 ]; then
     mkdir $1
   fi
@@ -24,7 +33,7 @@ function gather_image_from_list() {
       dir=${line%/*}
       mtl=${dir##*/}
       fname=${line##*/}
-      mkdirifnotexists "$2/${mtl}"
+      mkdir_if_not_exists "$2/${mtl}"
       cp $line "$2/${mtl}/${fname}"
     done
   fi
@@ -49,7 +58,7 @@ function gather_image_from_list2() {
       dir=${filepath%/*}
       mtl=${dir##*/}
       fname=${filepath##*/}
-      mkdirifnotexists "${2}/${mtl}"
+      mkdir_if_not_exists "${2}/${mtl}"
       cp $filepath "${2}/${mtl}/${pred}_${fname}"
     done
   fi
@@ -60,13 +69,6 @@ filespath="./files.txt"
 labelspath="./labels.txt"
 imagelistpath="./image_list.txt"
 num2labelpath="./num2label.txt"
-
-#clearf $filespath
-#clearf $labelspath
-#clearf $imagelistpath
-#clearf $num2labelpath
-
-
 
 #in_dir="./image"
 if [ $# -lt 1 ]; then
@@ -82,12 +84,15 @@ confusion_dir="${in_dir}/confusion"
 correct_list="${in_dir}/correct.txt"
 incorrect_list="${in_dir}/incorrect.txt"
 
-clearf $correct_list
-clearf $incorrect_list
-clearf $correct_dir
-clearf $incorrect_dir
-clearf $confusion_dir
+rm_if_exists $correct_list
+rm_if_exists $incorrect_list
+rm_if_exists $correct_dir
+rm_if_exists $incorrect_dir
+rm_if_exists $confusion_dir
 
+# 認識結果のファイルから、正解した画像のファイル名をcorrect_listに、
+# 誤認識した画像のファイル名をincorrect_listに記録
+# ファイルの最初の行は読み飛ばす
 awk '{ if ( NR > 1 && $2 == $3 ) {print $1} }' $1 > $correct_list
 awk '{ if ( NR > 1 && $2 != $3 ) {print $1} }' $1 > $incorrect_list
 
@@ -97,4 +102,4 @@ mkdir $confusion_dir
 
 gather_image_from_list $correct_list $correct_dir
 gather_image_from_list $incorrect_list $incorrect_dir
-gather_image_from_list2 $1 $confusion_dir 
+gather_image_from_list2 $1 $confusion_dir

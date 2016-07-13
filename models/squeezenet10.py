@@ -2,6 +2,7 @@ import chainer
 import chainer.functions as F
 import chainer.links as L
 import finetune
+import numpy as np
 
 class SqueezeNet10(chainer.Chain):
 
@@ -17,9 +18,16 @@ class SqueezeNet10(chainer.Chain):
         return y
 
     def add_fire(self, name, in_channels, s1, e1, e3):
-        super(GoogLeNet, self).add_link(name + '/squeeze1x1', F.Convolution2D(in_channels, s1, 1))
-        super(GoogLeNet, self).add_link(name + '/expand1x1', F.Convolution2D(e1, s1, 1))
-        super(GoogLeNet, self).add_link(name + '/expand3x3', F.Convolution2D(e1, s3, 3, pad=1))
+        super(SqueezeNet10, self).add_link(name + '/squeeze1x1', F.Convolution2D(in_channels, s1, 1))
+        super(SqueezeNet10, self).add_link(name + '/expand1x1', F.Convolution2D(s1, e1, 1))
+        super(SqueezeNet10, self).add_link(name + '/expand3x3', F.Convolution2D(s1, e3, 3, pad=1))
+
+    def getMean(self):
+        mean_image = np.ndarray((3, 256, 256), dtype=np.float32)
+        mean_image[0] = 104
+        mean_image[1] = 117
+        mean_image[2] = 123
+        return mean_image
 
     def set_finetune(self):
         finetune.load_param('./models/squeezenet_v1.0.pkl', self)
@@ -38,7 +46,7 @@ class SqueezeNet10(chainer.Chain):
         self.add_fire('fire9', 512, 64, 256, 256)
         super(SqueezeNet10, self).add_link('conv10_fmd', F.Convolution2D(
             512, self.labelsize, 1, pad=1,
-            initialW=normal(0, 0.01 (self.labelsize, 512, 1, 1))))
+            initialW=np.random.normal(0, 0.01, (self.labelsize, 512, 1, 1))))
 
         self.train = True
 
@@ -71,7 +79,7 @@ class SqueezeNet10(chainer.Chain):
         h = F.max_pooling_2d(h, 3, stride=2)
 
         h = self.my_fire(h, 'fire9')
-        h = F.dropout(h, ratio=0.5, train=train)
+        h = F.dropout(h, ratio=0.5, train=self.train)
 
         h = F.relu(self.conv10_fmd(h))
         h = F.reshape(F.average_pooling_2d(h, 13), (x.data.shape[0], self.labelsize))
@@ -98,7 +106,7 @@ class SqueezeNet10(chainer.Chain):
         h = F.max_pooling_2d(h, 3, stride=2)
 
         h = self.my_fire(h, 'fire9')
-        h = F.dropout(h, ratio=0.5, train=train)
+        h = F.dropout(h, ratio=0.5, train=self.train)
 
         h = F.relu(self.conv10_fmd(h))
         h = F.reshape(F.average_pooling_2d(h, 13), (x.data.shape[0], self.labelsize))

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # delete file if exists
-function clearf() {
+function rm_if_exists() {
   if [ -e $1 ]; then
     if [ -f $1 ] ; then
       rm $1
@@ -22,7 +22,7 @@ files="${in_dir}/*"
 dirary=()
 
 #rm -r $out_dir
-clearf $out_dir
+rm_if_exists $out_dir
 mkdir $out_dir
 
 for filepath in $files; do
@@ -41,7 +41,6 @@ for d in ${dirary[@]}; do
       if [[ "$m_file" =~ ^.*\.(jpg|png|bmp)$ ]]; then
         #scale image
         convert -crop 384x384+64+0 -geometry "${img_l}x${img_l}" $m_file "${out_dir}/${d##*/}/${m_file##*/}"
-	#echo "$img_l"
       fi
     fi
   done

@@ -49,17 +49,6 @@ def train(args):
     # Prepare dataset
     train_list = fmdio.load_image_list(args.train, args.root)
     val_list = fmdio.load_image_list(args.val, args.root)
-    mean_image = None
-    if args.arch == 'googlenet' or args.arch == 'googlenet2' or args.arch == 'caffegooglenet':
-        mean_image = np.ndarray((3, 256, 256), dtype=np.float32)
-        mean_image[0] = 104
-        mean_image[1] = 117
-        mean_image[2] = 123
-    else:
-        mean_image = pickle.load(open(args.mean, 'rb'))
-
-    assert mean_image is not None
-
     train_size = len(train_list)
     val_size = len(val_list)
 
@@ -76,6 +65,15 @@ def train(args):
     if args.finetune:
         print ('finetune')
         model.set_finetune()
+
+    mean_image = None
+    if hasattr(model, 'getMean'):
+        mean_image = model.getMean()
+    else:
+        #mean_image = pickle.load(open(args.mean, 'rb'))
+        mean_image = np.load(args.mean)
+
+    assert mean_image is not None
 
     print(model.__class__.__name__)
     print('total epoch : ' + str(args.epoch))
@@ -281,9 +279,9 @@ def train(args):
                 res_q.put('val')
                 serializers.save_hdf5(args.out, model)
                 serializers.save_hdf5(args.outstate, optimizer)
-                if ep % 10 == 0:
+                if ep % 20 == 0:
                     serializers.save_hdf5(args.out + str(ep), model)
-                    serializers.save_hdf5(args.outstate + str(ep), optimizer)
+                    #serializers.save_hdf5(args.outstate + str(ep), optimizer)
                 ep = ep+1
                 model.train = False
                 continue
@@ -335,7 +333,7 @@ if __name__ == '__main__':
                         help='Path to training image-label list file')
     parser.add_argument('--val', '-v', default='val.txt',
                         help='Path to validation image-label list file')
-    parser.add_argument('--mean', '-m', default='mean.npy',
+    parser.add_argument('--mean', '-m', default='ilsvrc_2012_mean.npy', #'mean.npy',
                         help='Path to the mean file (computed by compute_mean.py)')
     parser.add_argument('--arch', '-a', default='nin',
                         help='Convnet architecture \

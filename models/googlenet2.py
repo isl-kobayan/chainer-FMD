@@ -2,6 +2,7 @@ import chainer
 import chainer.functions as F
 import chainer.links as L
 import finetune
+import numpy as np
 
 class GoogLeNet2(chainer.Chain):
 
@@ -22,6 +23,13 @@ class GoogLeNet2(chainer.Chain):
         super(GoogLeNet2, self).add_link(name + '/5x5_reduce', F.Convolution2D(in_channels, proj5, 1))
         super(GoogLeNet2, self).add_link(name + '/5x5', F.Convolution2D(proj5, out5, 5, pad=2))
         super(GoogLeNet2, self).add_link(name + '/pool_proj', F.Convolution2D(in_channels, proj_pool, 1))
+
+    def getMean(self):
+        mean_image = np.ndarray((3, 256, 256), dtype=np.float32)
+        mean_image[0] = 104
+        mean_image[1] = 117
+        mean_image[2] = 123
+        return mean_image
 
     def set_finetune(self):
         finetune.load_param('./models/bvlc_googlenet.pkl', self)

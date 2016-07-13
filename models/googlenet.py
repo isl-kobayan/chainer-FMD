@@ -2,6 +2,7 @@ import chainer
 import chainer.functions as F
 import chainer.links as L
 import finetune
+import numpy as np
 
 class GoogLeNet(chainer.Chain):
 
@@ -22,6 +23,13 @@ class GoogLeNet(chainer.Chain):
         super(GoogLeNet, self).add_link(name + '/5x5_reduce', F.Convolution2D(in_channels, proj5, 1))
         super(GoogLeNet, self).add_link(name + '/5x5', F.Convolution2D(proj5, out5, 5, pad=2))
         super(GoogLeNet, self).add_link(name + '/pool_proj', F.Convolution2D(in_channels, proj_pool, 1))
+
+    def getMean(self):
+        mean_image = np.ndarray((3, 256, 256), dtype=np.float32)
+        mean_image[0] = 104
+        mean_image[1] = 117
+        mean_image[2] = 123
+        return mean_image
 
     def set_finetune(self):
         finetune.load_param('./models/bvlc_googlenet.pkl', self)
@@ -68,11 +76,11 @@ class GoogLeNet(chainer.Chain):
         self.clear()
         h = F.relu(self['conv1/7x7_s2'](x))
         h = F.local_response_normalization(
-            F.max_pooling_2d(h, 3, stride=2), n=5)
+            F.max_pooling_2d(h, 3, stride=2), n=5, alpha=(1e-4)/5, k=1)
         h = F.relu(self['conv2/3x3_reduce'](h))
         h = F.relu(self['conv2/3x3'](h))
         h = F.max_pooling_2d(
-            F.local_response_normalization(h, n=5), 3, stride=2)
+            F.local_response_normalization(h, n=5, alpha=(1e-4)/5, k=1), 3, stride=2)
 
         h = self.my_inception(h, 'inception_3a')
         h = self.my_inception(h, 'inception_3b')
@@ -112,11 +120,11 @@ class GoogLeNet(chainer.Chain):
         self.clear_test()
         h = F.relu(self['conv1/7x7_s2'](x))
         h = F.local_response_normalization(
-            F.max_pooling_2d(h, 3, stride=2), n=5)
+            F.max_pooling_2d(h, 3, stride=2), n=5, alpha=(1e-4)/5, k=1)
         h = F.relu(self['conv2/3x3_reduce'](h))
         h = F.relu(self['conv2/3x3'](h))
         h = F.max_pooling_2d(
-            F.local_response_normalization(h, n=5), 3, stride=2)
+            F.local_response_normalization(h, n=5, alpha=(1e-4)/5, k=1), 3, stride=2)
 
         h = self.my_inception(h, 'inception_3a')
         h = self.my_inception(h, 'inception_3b')

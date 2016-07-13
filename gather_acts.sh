@@ -44,11 +44,11 @@ function gather_image_from_list2() {
         FORMAT=$(printf "%04d_%02d" ${l} ${c})
         convert -gravity center -crop 224x224+0+0 ${col} "${2}/${FORMAT}.jpg"
         #echo ${c}
-        c=$((c+1)) 
+        c=$((c+1))
       done
-      FORMAT=$(printf "%04d_*" ${l})
+      FORMAT=$(printf "${2}/%04d_*" ${l})
       convert +append ${FORMAT} "${3}/${l}.jpg"
-      l=$((l+1)) 
+      l=$((l+1))
     done
   fi
   IFS=$OLDIFS
@@ -83,4 +83,5 @@ clearf $acts2_dir
 mkdir $acts_dir
 mkdir $acts2_dir
 
+#usage: gather_acts.sh ***/actsargs.csv
 gather_image_from_list2 $1 $acts_dir $acts2_dir

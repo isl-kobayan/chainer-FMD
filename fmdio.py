@@ -10,13 +10,7 @@ import matplotlib.pyplot as plt
 
 def read_image(path, insize, mean_image=None, center=False, flip=False):
     # Data loading routine
-    image = np.asarray(Image.open(path))
-    if len(image.shape) == 2: # if grayscale
-        sz=image.shape
-        img2=np.vstack((image,image))
-        image=np.vstack((image, img2)).reshape((3,sz[0],sz[1]))
-    else: # if color
-        image = image.transpose(2, 0, 1)
+    image = np.asarray(Image.open(path).convert('RGB')).transpose(2, 0, 1)[::-1]
 
     cropwidth = image.shape[1] - insize
     if center:
@@ -40,14 +34,7 @@ def read_image(path, insize, mean_image=None, center=False, flip=False):
 
 def read_crop_image(path, insize, mean_image=None, flip=False):
     # get image data as np.float32
-    image = np.asarray(Image.open(path))
-        
-    if len(image.shape) == 2: # if grayscale
-        sz=image.shape
-        img2=np.vstack((image,image))
-        image=np.vstack((image, img2)).reshape((3,sz[0],sz[1]))
-    else: # if color
-        image = image.transpose(2, 0, 1)
+    image = np.asarray(Image.open(path).convert('RGB')).transpose(2, 0, 1)[::-1]
 
     cropwidth = image.shape[1] - insize
     #if center:
@@ -141,7 +128,7 @@ def save_confmat_fig0(conf_arr, savename, labels):
     plt.clf()
     ax = fig.add_subplot(111)
     ax.set_aspect(1)
-    res = ax.imshow(np.array(norm_conf), cmap=plt.cm.jet, 
+    res = ax.imshow(np.array(norm_conf), cmap=plt.cm.jet,
                 interpolation='nearest')
 
     width = len(conf_arr)
@@ -149,7 +136,7 @@ def save_confmat_fig0(conf_arr, savename, labels):
 
     for x in xrange(width):
         for y in xrange(height):
-            ax.annotate(str(conf_arr[x][y]), xy=(y, x), 
+            ax.annotate(str(conf_arr[x][y]), xy=(y, x),
                         horizontalalignment='center',
                         verticalalignment='center')
 
@@ -160,7 +147,7 @@ def save_confmat_fig0(conf_arr, savename, labels):
     plt.savefig(savename, format='png')
 
 
-def save_confmat_fig(conf_arr, savename, labels, 
+def save_confmat_fig(conf_arr, savename, labels,
                      xlabel=None, ylabel=None, saveFormat="png",
                      title=None, clim=(None,None), mode="vote", cmap=plt.cm.Blues):
     if mode=="rate":
@@ -192,12 +179,12 @@ def save_confmat_fig(conf_arr, savename, labels,
     ax = fig.add_subplot(111)
     ax.set_aspect(1)
     if mode == "rate":
-        res = plt.imshow(np.array(norm_conf)*100, cmap=cmap, 
+        res = plt.imshow(np.array(norm_conf)*100, cmap=cmap,
                         interpolation='nearest')
         plt.clim(0,100)
         threshold = 0.5
     else:
-        res = plt.imshow(np.array(norm_conf), cmap=cmap, 
+        res = plt.imshow(np.array(norm_conf), cmap=cmap,
                         interpolation='nearest')
         if clim!=(None,None):
             plt.clim(*clim)
@@ -212,23 +199,24 @@ def save_confmat_fig(conf_arr, savename, labels,
             else:
                 textcolor = '0.0'
             if mode == "rate":
-                ax.annotate("{0:d}".format(int(conf_arr[x][y]*100)), xy=(y, x), 
+                ax.annotate("{0:d}".format(int(conf_arr[x][y]*100)), xy=(y, x),
                             horizontalalignment='center',
-                            verticalalignment='center',color=textcolor)
+                            verticalalignment='center', color=textcolor, fontsize=15)
             else:
-                ax.annotate("{0}".format(conf_arr[x][y]), xy=(y, x), 
+                ax.annotate("{0}".format(conf_arr[x][y]), xy=(y, x),
                             horizontalalignment='center',
-                            verticalalignment='center',color=textcolor)
+                            verticalalignment='center', color=textcolor, fontsize=15)
 
     cb = fig.colorbar(res)
+    cb.ax.tick_params(labelsize=15)
     if title != None:
         plt.text(0.5, 1.08, title,
                  horizontalalignment='center',
-                 fontsize=15,
+                 fontsize=20,
                  transform = ax.transAxes)
     ax.xaxis.tick_top()
-    plt.xticks(range(width), labels[:width], rotation=45)
-    plt.yticks(range(height), labels[:height])
+    plt.xticks(range(width), labels[:width], rotation=45, fontsize=15)
+    plt.yticks(range(height), labels[:height], fontsize=15)
     if xlabel != None:
         plt.xlabel(xlabel)
     if ylabel != None:
@@ -237,9 +225,9 @@ def save_confmat_fig(conf_arr, savename, labels,
     plt.savefig(savename, format=saveFormat)
     plt.close(fig)
 
-def save_pca_scatter_fig(data, savename, labels, 
+def save_pca_scatter_fig(data, savename, labels,
                      xlabel=None, ylabel=None, saveFormat="png",
-                     title=None, clim=(None,None), mode="vote", cmap=plt.cm.Blues):
+                     title=None, cmap=plt.cm.Blues):
     import sklearn.decomposition
     import matplotlib.cm as cm
     markers=['x', '+']

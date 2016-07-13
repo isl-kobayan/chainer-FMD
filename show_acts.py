@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-"""Example code of learning a large scale convnet from ILSVRC2012 dataset.
+# -*- coding: utf-8 -*-
+"""学習済みモデルに画像を入れ、最後の層の各ニューロンを活性させる画像は何か調べます。
 
 Prerequisite: To run this example, crop the center of ILSVRC2012 training and
 validation images and scale them to 256x256, and make two lists of space-
@@ -49,8 +50,6 @@ parser.add_argument('--batchsize', '-B', type=int, default=10,
                     help='Learning minibatch size')
 parser.add_argument('--val_batchsize', '-b', type=int, default=10,
                     help='Validation minibatch size')
-parser.add_argument('--epoch', '-E', default=10, type=int,
-                    help='Number of epochs to learn')
 parser.add_argument('--gpu', '-g', default=0, type=int,
                     help='GPU ID (negative value indicates CPU)')
 parser.add_argument('--loaderjob', '-j', default=20, type=int,
@@ -78,45 +77,28 @@ xp = cuda.cupy if args.gpu >= 0 else np
 #train_list = fmdio.load_image_list(args.train, args.root)
 num2label = fmdio.load_num2label(args.label)
 val_list = fmdio.load_image_list(args.val, args.root)
-#mean_image = pickle.load(open(args.mean, 'rb'))
+
 mean_image = None
 if args.arch == 'googlenet' or args.arch == 'googlenet2' or args.arch == 'caffegooglenet':
-    mean_image = np.ndarray((3, 256, 256), dtype=np.float32)
-    mean_image[0] = 104
-    mean_image[1] = 117
-    mean_image[2] = 123
+    mean_image = models.getGoogLeNetMean()
+elif args.arch == 'vgg16':
+    mean_image = models.getVGGMean()
 else:
     mean_image = pickle.load(open(args.mean, 'rb'))
 
 assert mean_image is not None
 
-#train_size = len(train_list)
 val_size = len(val_list)
 
 assert val_size % args.val_batchsize == 0
 
 # Prepare model
-if args.arch == 'nin':
-    model = models.NIN()
-elif args.arch == 'alex':
-    model = models.Alex()
-elif args.arch == 'alexbn':
-    model = models.AlexBN()
-elif args.arch == 'googlenet':
-    model = models.GoogLeNet()
-elif args.arch == 'googlenet2':
-    model = models.GoogLeNet2()
-elif args.arch == 'googlenetbn':
-    model = models.GoogLeNetBN()
-elif args.arch == 'caffealex':
-    model = models.CaffeAlex()
-elif args.arch == 'caffegooglenet':
-    model = models.CaffeGoogLeNet()
-else:
+model = models.getModel(args.arch)
+if model is None:
     raise ValueError('Invalid architecture name')
 
 print(model.__class__.__name__)
-print('total epoch : ' + str(args.epoch))
+
 
 nowt = datetime.datetime.today()
 outdir = './test_' + args.arch + '_bs' + str(args.val_batchsize) + '_' + nowt.strftime("%Y%m%d-%H%M")
@@ -178,7 +160,7 @@ def feed_data():
         val_y_batch[j] = label
         val_i_batch[j] = idx
         j += 1
-        
+
         if j == args.val_batchsize:
             for k, x in enumerate(val_batch_pool):
                 val_x_batch[k] = x.get()
@@ -250,17 +232,17 @@ def log_result():
             else:
                 allacts = np.r_[allacts, acts.get().reshape((len(acts), -1))]
             #print(allacts.shape)
-            
+
             for idx, list_idx in enumerate(list_indices):
                 path, label = val_list[list_idx]
                 res_str = res_str + path + '\t' + num2label[label] + '\t' + num2label[int(y_pred[idx])]
                 acts_str = acts_str + path + '\t' + num2label[label] + '\t' + num2label[int(y_pred[idx])]
                 thisacts=acts[idx].get().reshape(len(acts[idx]))
                 fmdio.append_acts(actsfilename, path, thisacts)
-                
+
                 for label_idx in six.moves.range(lblmax):
                     res_str = res_str + '\t' + str(probability_map.data[idx, label_idx])
-                    #acts_str = acts_str + 
+                    #acts_str = acts_str +
                     #print(thisacts.shape)
                 res_str = res_str + '\n'
                 acts_str = acts_str + '\n'
@@ -302,7 +284,7 @@ def train_loop():
         t = chainer.Variable(xp.asarray(inp[1]), volatile=volatile)
         indices = np.asarray(inp[2])
         y_true = np.asarray(inp[1])
-        model.getacts(x, t)
+        model.test(x, t)
         res_q.put((float(model.loss.data), float(model.accuracy.data), model.lastacts.data, y_true, indices, model.acts.data))
         del x, t
 
@@ -317,5 +299,3 @@ logger.start()
 train_loop()
 feeder.join()
 logger.join()
-
-
