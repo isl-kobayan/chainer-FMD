@@ -1,5 +1,6 @@
 import chainer
 import chainer.link as link
+from chainer.functions import caffe
 import cPickle as pickle
 import os.path
 
@@ -31,14 +32,14 @@ def copy_model(src, dst):
 def change_ext(path, ext):
     dirname = os.path.dirname(path)
     filename = os.path.basename(path)
-    fname, ext = os.path.splitext(filename)
+    fname, _ = os.path.splitext(filename)
     return os.path.join(dirname, fname + ext)
 
 def makepkl(path, model):
     pklfilepath = change_ext(path, '.pkl')
     pickle.dump(model, open(pklfilepath, 'wb'))
 
-def finetune(path, obj):
+def load_param(path, obj):
     src = None
 
     # load .pkl if exists
@@ -48,6 +49,6 @@ def finetune(path, obj):
     # load caffemodel and save pkl (if .pkl file doesn't exist)
     else:
         src = caffe.CaffeFunction(change_ext(path, '.caffemodel'))
-        pickle.dump(model, open(change_ext(path, '.pkl'), 'wb'))
+        pickle.dump(src, open(change_ext(path, '.pkl'), 'wb'))
 
     copy_model(src, obj)

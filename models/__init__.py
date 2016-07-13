@@ -4,13 +4,10 @@ import alexbn
 import googlenet
 import googlenet2
 import googlenetbn
+import vgg16
 import caffealex
 import caffegooglenet
-import VGGNet
-import caffevgg
-import chainerVGGNet
-import googlenetfmd
-import vgg16
+import numpy as np
 
 NIN = nin.NIN
 Alex = alex.Alex
@@ -18,13 +15,9 @@ AlexBN = alexbn.AlexBN
 GoogLeNet = googlenet.GoogLeNet
 GoogLeNet2 = googlenet2.GoogLeNet2
 GoogLeNetBN = googlenetbn.GoogLeNetBN
+VGG16 = vgg16.VGG16
 CaffeAlex = caffealex.CaffeAlex
 CaffeGoogLeNet = caffegooglenet.CaffeGoogLeNet
-VGGNet = VGGNet.VGGNet
-CaffeVGG = caffevgg.CaffeVGG
-ChainerVGGNet = chainerVGGNet.ChainerVGGNet
-GoogLeNetFMD = googlenetfmd.GoogLeNet
-VGG16 = vgg16.VGG16
 
 def getModel(arch):
     if arch == 'nin':
@@ -37,20 +30,35 @@ def getModel(arch):
             return VGG16()
     elif arch == 'googlenet':
         return GoogLeNet()
-    elif arch == 'googlenetfmd':
-        return GoogLeNetFMD()
+    elif arch == 'googlenet2':
+        return GoogLeNet2()
     elif arch == 'googlenetbn':
         return GoogLeNetBN()
     elif arch == 'caffealex':
         return CaffeAlex()
     elif arch == 'caffegooglenet':
         return CaffeGoogLeNet()
-    elif arch == 'vggnet':
-        return VGGNet()
-    elif arch == 'caffevgg':
-        return CaffeVGG()
-    elif arch == 'chainervggnet':
-        return ChainerVGGNet()
     else:
         raise ValueError('Invalid architecture name')
         return None
+
+def getGoogLeNetMean():
+    mean_image = np.ndarray((3, 256, 256), dtype=np.float32)
+    mean_image[0] = 104
+    mean_image[1] = 117
+    mean_image[2] = 123
+    return mean_image
+
+def getVGGMean():
+    mean_image = np.ndarray((3, 256, 256), dtype=np.float32)
+    mean_image[0] = 103.939
+    mean_image[1] = 116.779
+    mean_image[2] = 123.68
+    return mean_image
+
+def getSqueezeNetMean():
+    mean_image = np.ndarray((3, 256, 256), dtype=np.float32)
+    mean_image[0] = 104
+    mean_image[1] = 117
+    mean_image[2] = 123
+    return mean_image

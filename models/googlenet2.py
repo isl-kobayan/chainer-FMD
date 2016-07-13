@@ -1,122 +1,123 @@
 import chainer
 import chainer.functions as F
 import chainer.links as L
-
+import finetune
 
 class GoogLeNet2(chainer.Chain):
 
     insize = 224
 
+    def my_inception(self, x, name):
+        out1 = self[name + '/1x1'](x)
+        out3 = self[name + '/3x3'](F.relu(self[name + '/3x3_reduce'](x)))
+        out5 = self[name + '/5x5'](F.relu(self[name + '/5x5_reduce'](x)))
+        pool = self[name + '/pool_proj'](F.max_pooling_2d(x, 3, stride=1, pad=1))
+        y = F.relu(F.concat((out1, out3, out5, pool), axis=1))
+        return y
+
+    def add_inception(self, name, in_channels, out1, proj3, out3, proj5, out5, proj_pool):
+        super(GoogLeNet2, self).add_link(name + '/1x1', F.Convolution2D(in_channels, out1, 1))
+        super(GoogLeNet2, self).add_link(name + '/3x3_reduce', F.Convolution2D(in_channels, proj3, 1))
+        super(GoogLeNet2, self).add_link(name + '/3x3', F.Convolution2D(proj3, out3, 3, pad=1))
+        super(GoogLeNet2, self).add_link(name + '/5x5_reduce', F.Convolution2D(in_channels, proj5, 1))
+        super(GoogLeNet2, self).add_link(name + '/5x5', F.Convolution2D(proj5, out5, 5, pad=2))
+        super(GoogLeNet2, self).add_link(name + '/pool_proj', F.Convolution2D(in_channels, proj_pool, 1))
+
+    def set_finetune(self):
+        finetune.load_param('./models/bvlc_googlenet.pkl', self)
+
     def __init__(self):
         self.labelsize = 10
-        super(GoogLeNet2, self).__init__(
-            conv1=L.Convolution2D(3,  64, 7, stride=2, pad=3),
-            conv2_reduce=L.Convolution2D(64,  64, 1),
-            conv2=L.Convolution2D(64, 192, 3, stride=1, pad=1),
-            inc3a=L.Inception(192,  64,  96, 128, 16,  32,  32),
-            inc3b=L.Inception(256, 128, 128, 192, 32,  96,  64),
-            inc4a=L.Inception(480, 192,  96, 208, 16,  48,  64),
-            inc4b=L.Inception(512, 160, 112, 224, 24,  64,  64),
-            inc4c=L.Inception(512, 128, 128, 256, 24,  64,  64),
-            inc4d=L.Inception(512, 112, 144, 288, 32,  64,  64),
-            inc4e=L.Inception(528, 256, 160, 320, 32, 128, 128),
-            inc5a=L.Inception(832, 256, 160, 320, 32, 128, 128),
-            inc5b=L.Inception(832, 384, 192, 384, 48, 128, 128),
-            loss3_fc=L.Linear(1024, self.labelsize),
+        super(GoogLeNet2, self).__init__()
+        super(GoogLeNet2, self).add_link('conv1/7x7_s2', F.Convolution2D(3,  64, 7, stride=2, pad=3))
+        super(GoogLeNet2, self).add_link('conv2/3x3_reduce', F.Convolution2D(64,  64, 1))
+        super(GoogLeNet2, self).add_link('conv2/3x3', F.Convolution2D(64, 192, 3, stride=1, pad=1))
+        self.add_inception('inception_3a', 192,  64,  96, 128, 16,  32,  32)
+        self.add_inception('inception_3b', 256, 128, 128, 192, 32,  96,  64)
+        self.add_inception('inception_4a', 480, 192,  96, 208, 16,  48,  64)
+        self.add_inception('inception_4b', 512, 160, 112, 224, 24,  64,  64)
+        self.add_inception('inception_4c', 512, 128, 128, 256, 24,  64,  64)
+        self.add_inception('inception_4d', 512, 112, 144, 288, 32,  64,  64)
+        self.add_inception('inception_4e', 528, 256, 160, 320, 32, 128, 128)
+        self.add_inception('inception_5a', 832, 256, 160, 320, 32, 128, 128)
+        self.add_inception('inception_5b', 832, 384, 192, 384, 48, 128, 128)
 
-            loss1_conv=L.Convolution2D(512, 128, 1),
-            loss1_fc1=L.Linear(4 * 4 * 128, 1024),
-            loss1_fc2=L.Linear(1024, self.labelsize),
+        super(GoogLeNet2, self).add_link('loss3/classifier_fmd', F.Linear(1024, self.labelsize))
 
-            loss2_conv=L.Convolution2D(528, 128, 1),
-            loss2_fc1=L.Linear(4 * 4 * 128, 1024),
-            loss2_fc2=L.Linear(1024, self.labelsize)
-        )
         self.train = True
 
+    def clear(self):
+        self.loss = None
+        self.accuracy = None
+
+    def clear_test(self):
+        self.loss = None
+        self.accuracy = None
+        self.acts = None
+        self.lastacts = None
+
     def __call__(self, x, t):
-        h = F.relu(self.conv1(x))
+        self.clear()
+        h = F.relu(self['conv1/7x7_s2'](x))
         h = F.local_response_normalization(
             F.max_pooling_2d(h, 3, stride=2), n=5)
-        h = F.relu(self.conv2_reduce(h))
-        h = F.relu(self.conv2(h))
+        h = F.relu(self['conv2/3x3_reduce'](h))
+        h = F.relu(self['conv2/3x3'](h))
         h = F.max_pooling_2d(
             F.local_response_normalization(h, n=5), 3, stride=2)
 
-        h = self.inc3a(h)
-        h = self.inc3b(h)
+        h = self.my_inception(h, 'inception_3a')
+        h = self.my_inception(h, 'inception_3b')
         h = F.max_pooling_2d(h, 3, stride=2)
-        h = self.inc4a(h)
+        h = self.my_inception(h, 'inception_4a')
 
-        l = F.average_pooling_2d(h, 5, stride=3)
-        l = F.relu(self.loss1_conv(l))
-        l = F.dropout(F.relu(self.loss1_fc1(l)), 0.7, train=self.train)
-        l = self.loss1_fc2(l)
-        self.loss1 = F.softmax_cross_entropy(l, t)
+        h = self.my_inception(h, 'inception_4b')
+        h = self.my_inception(h, 'inception_4c')
+        h = self.my_inception(h, 'inception_4d')
 
-        h = self.inc4b(h)
-        h = self.inc4c(h)
-        h = self.inc4d(h)
-
-        l = F.average_pooling_2d(h, 5, stride=3)
-        l = F.relu(self.loss2_conv(l))
-        l = F.dropout(F.relu(self.loss2_fc1(l)), 0.7, train=self.train)
-        l = self.loss2_fc2(l)
-        self.loss2 = F.softmax_cross_entropy(l, t)
-
-        h = self.inc4e(h)
+        h = self.my_inception(h, 'inception_4e')
         h = F.max_pooling_2d(h, 3, stride=2)
-        h = self.inc5a(h)
-        h = self.inc5b(h)
+        h = self.my_inception(h, 'inception_5a')
+        h = self.my_inception(h, 'inception_5b')
 
         h = F.average_pooling_2d(h, 7, stride=1)
-        h = self.loss3_fc(F.dropout(h, 0.4, train=self.train))
+        h = self['loss3/classifier_fmd'](F.dropout(h, 0.4, train=self.train))
         self.loss3 = F.softmax_cross_entropy(h, t)
 
-        self.loss = 0.3 * (self.loss1 + self.loss2) + self.loss3
+        self.loss = self.loss3
         self.accuracy = F.accuracy(h, t)
         return self.loss
 
     def test(self, x, t):
-        h = F.relu(self.conv1(x))
+        self.clear_test()
+        h = F.relu(self['conv1/7x7_s2'](x))
         h = F.local_response_normalization(
             F.max_pooling_2d(h, 3, stride=2), n=5)
-        h = F.relu(self.conv2_reduce(h))
-        h = F.relu(self.conv2(h))
+        h = F.relu(self['conv2/3x3_reduce'](h))
+        h = F.relu(self['conv2/3x3'](h))
         h = F.max_pooling_2d(
             F.local_response_normalization(h, n=5), 3, stride=2)
 
-        h = self.inc3a(h)
-        h = self.inc3b(h)
+        h = self.my_inception(h, 'inception_3a')
+        h = self.my_inception(h, 'inception_3b')
         h = F.max_pooling_2d(h, 3, stride=2)
-        h = self.inc4a(h)
+        h = self.my_inception(h, 'inception_4a')
 
-        l = F.average_pooling_2d(h, 5, stride=3)
-        l = F.relu(self.loss1_conv(l))
-        l = F.dropout(F.relu(self.loss1_fc1(l)), 0.7, train=self.train)
-        l = self.loss1_fc2(l)
-        self.loss1 = F.softmax_cross_entropy(l, t)
+        h = self.my_inception(h, 'inception_4b')
+        h = self.my_inception(h, 'inception_4c')
+        h = self.my_inception(h, 'inception_4d')
 
-        h = self.inc4b(h)
-        h = self.inc4c(h)
-        h = self.inc4d(h)
-
-        l = F.average_pooling_2d(h, 5, stride=3)
-        l = F.relu(self.loss2_conv(l))
-        l = F.dropout(F.relu(self.loss2_fc1(l)), 0.7, train=self.train)
-        l = self.loss2_fc2(l)
-        self.loss2 = F.softmax_cross_entropy(l, t)
-
-        h = self.inc4e(h)
+        h = self.my_inception(h, 'inception_4e')
         h = F.max_pooling_2d(h, 3, stride=2)
-        h = self.inc5a(h)
-        h = self.inc5b(h)
+        h = self.my_inception(h, 'inception_5a')
+        h = self.my_inception(h, 'inception_5b')
 
         h = F.average_pooling_2d(h, 7, stride=1)
-        h = self.loss3_fc(F.dropout(h, 0.4, train=self.train))
+        self.acts = h
+        h = self['loss3/classifier_fmd'](F.dropout(h, 0.4, train=self.train))
         self.loss3 = F.softmax_cross_entropy(h, t)
 
-        self.loss = 0.3 * (self.loss1 + self.loss2) + self.loss3
+        self.loss = self.loss3
         self.accuracy = F.accuracy(h, t)
         self.lastacts = h
         return self.loss
