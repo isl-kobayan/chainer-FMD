@@ -54,6 +54,8 @@ parser.add_argument('--pad', '-p', type=int, default=1,
                     help='filter padding')
 parser.add_argument('--cols', '-c', type=int, default=1,
                     help='columns')
+parser.add_argument('--gamma', '-G', type=float, default=1.0,
+                    help='gamma')
 parser.add_argument('--finetune', '-f', default=False, action='store_true',
                     help='Visualize filters before fine-tuning if True (default: False)')
 args = parser.parse_args()
@@ -88,6 +90,7 @@ print('max, min = ', Wmax, Wmin)
 cols = args.cols
 pad = args.pad
 scale = args.scale
+gamma = args.gamma
 rows = (int)((out_ch + cols - 1) / cols)
 
 w_step = width * scale + pad
@@ -101,7 +104,7 @@ all_img = Image.new('RGB', (all_img_width, all_img_height), (255, 255, 255))
 # if number of input channels is 3, visualize filter with RGB
 if in_ch == 3:
     for i in six.moves.range(0, out_ch):
-        filter_data = (W[i][::-1].transpose(1, 2, 0) - Wmin) * 255 / Wrange
+        filter_data = (((W[i][::-1].transpose(1, 2, 0) - Wmin) / Wrange) ** gamma) * 255 
         img = Image.fromarray(np.uint8(filter_data))
         if args.scale > 1:
             img = img.resize((width * scale, height * scale), Image.NEAREST)
@@ -111,6 +114,6 @@ if in_ch == 3:
 else:
     for i in six.moves.range(0, out_ch):
         for j in six.moves.range(0, in_ch):
-            filter_data = (W[i][j] - Wmin) * 255 / Wrange
+            filter_data = (((W[i][j] - Wmin) / Wrange) ** gamma) * 255
             img = Image.fromarray(np.uint8(filter_data))
             img.save(outdir + '/w' + str(i) + '_' + str(j) + '.png')
