@@ -41,11 +41,11 @@ parser.add_argument('--val', '-v', default='val.txt',
                     help='Path to validation image-label list file')
 parser.add_argument('--label', '-l', default='num2label.txt',
                     help='Path to validation image-label list file')
-parser.add_argument('--mean', '-m', default='mean.npy',
+parser.add_argument('--mean', '-m', default='ilsvrc_2012_mean.npy', #'mean.npy',
                     help='Path to the mean file (computed by compute_mean.py)')
 parser.add_argument('--arch', '-a', default='nin',
                     help='Convnet architecture \
-                    (nin, alex, alexbn, googlenet, googlenetbn, caffealex, caffegooglenet)')
+                    (nin, alex, alexbn, vgg16, googlenet, googlenet2, googlenetbn)')
 parser.add_argument('--batchsize', '-B', type=int, default=10,
                     help='Learning minibatch size')
 parser.add_argument('--val_batchsize', '-b', type=int, default=10,
@@ -78,16 +78,6 @@ xp = cuda.cupy if args.gpu >= 0 else np
 num2label = fmdio.load_num2label(args.label)
 val_list = fmdio.load_image_list(args.val, args.root)
 
-mean_image = None
-if args.arch == 'googlenet' or args.arch == 'googlenet2' or args.arch == 'caffegooglenet':
-    mean_image = models.getGoogLeNetMean()
-elif args.arch == 'vgg16':
-    mean_image = models.getVGGMean()
-else:
-    mean_image = pickle.load(open(args.mean, 'rb'))
-
-assert mean_image is not None
-
 val_size = len(val_list)
 
 assert val_size % args.val_batchsize == 0
@@ -96,6 +86,15 @@ assert val_size % args.val_batchsize == 0
 model = models.getModel(args.arch)
 if model is None:
     raise ValueError('Invalid architecture name')
+
+mean_image = None
+if hasattr(model, 'getMean'):
+    mean_image = model.getMean()
+else:
+    #mean_image = pickle.load(open(args.mean, 'rb'))
+    mean_image = np.load(args.mean)
+
+assert mean_image is not None
 
 print(model.__class__.__name__)
 

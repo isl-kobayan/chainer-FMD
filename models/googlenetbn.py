@@ -1,7 +1,7 @@
 import chainer
 import chainer.functions as F
 import chainer.links as L
-
+import config
 
 class GoogLeNetBN(chainer.Chain):
 
@@ -9,8 +9,8 @@ class GoogLeNetBN(chainer.Chain):
 
     insize = 224
 
-    def __init__(self):
-        self.labelsize = 10
+    def __init__(self, labelsize=config.labelsize):
+        self.labelsize = labelsize
         super(GoogLeNetBN, self).__init__(
             conv1=L.Convolution2D(3, 64, 7, stride=2, pad=3, nobias=True),
             norm1=L.BatchNormalization(64),
@@ -77,7 +77,7 @@ class GoogLeNetBN(chainer.Chain):
         a = F.relu(self.norma(self.conva(a), test=test))
         a = F.relu(self.norma2(self.lina(a), test=test))
         a = self.outa(a)
-        self.loss1 = F.softmax_cross_entropy(a, t)
+        loss1 = F.softmax_cross_entropy(a, t)
 
         h = self.inc4b(h)
         h = self.inc4c(h)
@@ -87,54 +87,21 @@ class GoogLeNetBN(chainer.Chain):
         b = F.relu(self.normb(self.convb(b), test=test))
         b = F.relu(self.normb2(self.linb(b), test=test))
         b = self.outb(b)
-        self.loss2 = F.softmax_cross_entropy(b, t)
+        loss2 = F.softmax_cross_entropy(b, t)
 
         h = self.inc4e(h)
         h = self.inc5a(h)
         h = F.average_pooling_2d(self.inc5b(h), 7)
         h = self.out(h)
-        self.loss3 = F.softmax_cross_entropy(h, t)
+        loss3 = F.softmax_cross_entropy(h, t)
 
-        self.loss = 0.3 * (self.loss1 + self.loss2) + self.loss3
-        self.accuracy = F.accuracy(h, t)
-        return self.loss
-
-    def test(self, x, t):
-        test = not self.train
-
-        h = F.max_pooling_2d(
-            F.relu(self.norm1(self.conv1(x), test=test)),  3, stride=2, pad=1)
-        h = F.max_pooling_2d(
-            F.relu(self.norm2(self.conv2(h), test=test)), 3, stride=2, pad=1)
-
-        h = self.inc3a(h)
-        h = self.inc3b(h)
-        h = self.inc3c(h)
-        h = self.inc4a(h)
-
-        a = F.average_pooling_2d(h, 5, stride=3)
-        a = F.relu(self.norma(self.conva(a), test=test))
-        a = F.relu(self.norma2(self.lina(a), test=test))
-        a = self.outa(a)
-        self.loss1 = F.softmax_cross_entropy(a, t)
-
-        h = self.inc4b(h)
-        h = self.inc4c(h)
-        h = self.inc4d(h)
-
-        b = F.average_pooling_2d(h, 5, stride=3)
-        b = F.relu(self.normb(self.convb(b), test=test))
-        b = F.relu(self.normb2(self.linb(b), test=test))
-        b = self.outb(b)
-        self.loss2 = F.softmax_cross_entropy(b, t)
-
-        h = self.inc4e(h)
-        h = self.inc5a(h)
-        h = F.average_pooling_2d(self.inc5b(h), 7)
-        h = self.out(h)
-        self.loss3 = F.softmax_cross_entropy(h, t)
-
-        self.loss = 0.3 * (self.loss1 + self.loss2) + self.loss3
-        self.accuracy = F.accuracy(h, t)
-        self.lastacts = h
-        return self.loss
+        loss = 0.3 * (self.loss1 + self.loss2) + self.loss3
+        accuracy = F.accuracy(h, t)
+        chainer.report({
+            'loss': loss,
+            'loss1': loss1,
+            'loss2': loss2,
+            'loss3': loss3,
+            'accuracy': accuracy,
+        }, self)
+        return loss

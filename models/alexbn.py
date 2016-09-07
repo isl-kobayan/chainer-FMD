@@ -1,7 +1,7 @@
 import chainer
 import chainer.functions as F
 import chainer.links as L
-
+import config
 
 class AlexBN(chainer.Chain):
 
@@ -9,8 +9,8 @@ class AlexBN(chainer.Chain):
 
     insize = 227
 
-    def __init__(self):
-        self.labelsize = 10
+    def __init__(self, labelsize=config.labelsize):
+        self.labelsize = labelsize
         super(AlexBN, self).__init__(
             conv1=L.Convolution2D(3,  96, 11, stride=4),
             bn1=L.BatchNormalization(96),
@@ -37,23 +37,9 @@ class AlexBN(chainer.Chain):
         h = F.dropout(F.relu(self.fc7(h)), train=self.train)
         h = self.fc8(h)
 
-        self.loss = F.softmax_cross_entropy(h, t)
-        self.accuracy = F.accuracy(h, t)
-        return self.loss
-
-    def test(self, x, t):
-        h = self.bn1(self.conv1(x), test=not self.train)
-        h = F.max_pooling_2d(F.relu(h), 3, stride=2)
-        h = self.bn2(self.conv2(h), test=not self.train)
-        h = F.max_pooling_2d(F.relu(h), 3, stride=2)
-        h = F.relu(self.conv3(h))
-        h = F.relu(self.conv4(h))
-        h = F.max_pooling_2d(F.relu(self.conv5(h)), 3, stride=2)
-        h = F.dropout(F.relu(self.fc6(h)), train=self.train)
-        h = F.dropout(F.relu(self.fc7(h)), train=self.train)
-        h = self.fc8(h)
-
-        self.loss = F.softmax_cross_entropy(h, t)
-        self.accuracy = F.accuracy(h, t)
-        self.lastacts = h
-        return self.loss
+        #self.loss = F.softmax_cross_entropy(h, t)
+        #self.accuracy = F.accuracy(h, t)
+        #return self.loss
+        loss = F.softmax_cross_entropy(h, t)
+        chainer.report({'loss': loss, 'accuracy': F.accuracy(h, t)}, self)
+        return loss

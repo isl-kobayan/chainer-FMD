@@ -44,7 +44,7 @@ parser.add_argument('--mean', '-m', default='ilsvrc_2012_mean.npy', #'mean.npy',
                     help='Path to the mean file (computed by compute_mean.py)')
 parser.add_argument('--arch', '-a', default='nin',
                     help='Convnet architecture \
-                    (nin, alex, alexbn, googlenet, googlenet2, googlenetbn, caffealex, caffegooglenet, vggnet, caffevgg, chainervggnet)')
+                    (nin, alex, alexbn, vgg16, googlenet, googlenet2, googlenetbn)')
 parser.add_argument('--batchsize', '-B', type=int, default=10,
                     help='Learning minibatch size')
 parser.add_argument('--val_batchsize', '-b', type=int, default=10,
@@ -176,7 +176,7 @@ def log_result():
     # Logger
     trainlogfilename=outdir+'/test_train.log'
     testlogfilename=outdir+'/test_result.log'
-    tablefilename=outdir+'/table.csv'
+    tablefilename=outdir+'/confmat.csv'
     confmatfigfilename=outdir+'/confmat.eps'
     compfilename=outdir+'/comp.log'
     confusion_matrix=np.zeros(lblmax*lblmax, dtype=np.int32)
